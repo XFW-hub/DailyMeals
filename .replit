@@ -1,5 +1,6 @@
-# Replit 运行配置
+# Replit 运行配置（需配合 replit.nix 中的 Node 环境）
 run = "npm start"
 
 [deployment]
-run = ["sh", "-c", "npm install && npm start"]
+build = ["npm", "install"]
+run = ["npm", "start"]
