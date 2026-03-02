@@ -54,8 +54,9 @@
         <span class="avatar-wrap" id="currentUserAvatar">🍳</span>
         <span class="user-name" id="currentUserName">—</span>
       </div>
-      <button type="button" class="btn btn-ghost btn-block" id="btnLogout">退出登录</button>
       <button type="button" class="btn btn-ghost btn-block" id="btnEditAvatar">更换头像</button>
+      <button type="button" class="btn btn-ghost btn-block" id="btnAdminUsers" style="display:none;">用户管理</button>
+      <button type="button" class="btn btn-ghost btn-block" id="btnLogout">退出登录</button>
     </aside>
 
     <div class="content">
@@ -137,6 +138,7 @@
 
           <section id="adminSection" class="admin-section card hidden">
             <h2>用户管理（管理员）</h2>
+            <p id="adminUserCount" class="admin-user-count"></p>
             <div id="adminUserList" class="admin-user-list"></div>
           </section>
         </section>

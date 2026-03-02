@@ -21,17 +21,23 @@ if (!fs.existsSync(RECORDS_FILE)) fs.writeFileSync(RECORDS_FILE, '[]');
 if (!fs.existsSync(USERS_FILE)) fs.writeFileSync(USERS_FILE, '[]');
 if (!fs.existsSync(SESSIONS_FILE)) fs.writeFileSync(SESSIONS_FILE, '{}');
 
-// 已有用户但没有管理员时：指定用户名为 xiaofang 的为管理员；若无则用第一个用户
-const ADMIN_USERNAME = 'xiaofang';
+// 指定用户名为 xiaofang 或 小方 的为管理员；若无则至少保证有一名管理员（第一个用户）
+const ADMIN_USERNAMES = ['xiaofang', '小方'];
 
 function ensureOneAdmin() {
   const users = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
   if (users.length === 0) return;
+  const nameMatch = (u) => ADMIN_USERNAMES.some(a => (u.name || '').trim().toLowerCase() === a.toLowerCase() || (u.name || '').trim() === a);
+  const xiaofangUser = users.find(nameMatch);
+  if (xiaofangUser) {
+    xiaofangUser.role = 'admin';
+    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), 'utf8');
+    return;
+  }
   const hasAdmin = users.some(u => u.role === 'admin');
   if (hasAdmin) return;
-  const xiaofang = users.find(u => (u.name || '').trim().toLowerCase() === ADMIN_USERNAME.toLowerCase());
-  const target = xiaofang || users.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''))[0];
-  if (target) target.role = 'admin';
+  users.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+  users[0].role = 'admin';
   fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), 'utf8');
 }
 ensureOneAdmin();

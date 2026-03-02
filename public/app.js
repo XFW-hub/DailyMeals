@@ -83,11 +83,15 @@ function showAppScreen() {
   if (currentUser) {
     $('#currentUserAvatar').textContent = currentUser.avatar || '🍳';
     $('#currentUserName').textContent = currentUser.name || '—';
+    const adminSection = $('#adminSection');
+    const btnAdmin = $('#btnAdminUsers');
     if (currentUser.role === 'admin') {
-      $('#adminSection').classList.remove('hidden');
+      adminSection.classList.remove('hidden');
+      if (btnAdmin) btnAdmin.style.display = 'block';
       loadAdminUsers();
     } else {
-      $('#adminSection').classList.add('hidden');
+      adminSection.classList.add('hidden');
+      if (btnAdmin) btnAdmin.style.display = 'none';
     }
   }
 }
@@ -104,8 +108,10 @@ async function loadAdminUsers() {
 
 function renderAdminUserList(list) {
   const el = $('#adminUserList');
+  const countEl = $('#adminUserCount');
+  if (countEl) countEl.textContent = list.length ? `当前共 ${list.length} 名用户` : '';
   if (!list.length) {
-    el.innerHTML = '<p class="empty-tip">暂无其他用户</p>';
+    el.innerHTML = '<p class="empty-tip">暂无用户</p>';
     return;
   }
   el.innerHTML = list.map(u => {
@@ -374,6 +380,9 @@ function init() {
     showAuthScreen();
   });
 
+  $('#btnAdminUsers').addEventListener('click', () => {
+    $('#adminSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
   $('#btnEditAvatar').addEventListener('click', () => {
     const container = $('#avatarPickerEdit');
     container.innerHTML = AVATAR_OPTIONS.map(emoji => {
