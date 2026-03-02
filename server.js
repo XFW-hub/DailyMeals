@@ -21,6 +21,21 @@ if (!fs.existsSync(RECORDS_FILE)) fs.writeFileSync(RECORDS_FILE, '[]');
 if (!fs.existsSync(USERS_FILE)) fs.writeFileSync(USERS_FILE, '[]');
 if (!fs.existsSync(SESSIONS_FILE)) fs.writeFileSync(SESSIONS_FILE, '{}');
 
+// 已有用户但没有管理员时：指定用户名为 xiaofang 的为管理员；若无则用第一个用户
+const ADMIN_USERNAME = 'xiaofang';
+
+function ensureOneAdmin() {
+  const users = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
+  if (users.length === 0) return;
+  const hasAdmin = users.some(u => u.role === 'admin');
+  if (hasAdmin) return;
+  const xiaofang = users.find(u => (u.name || '').trim().toLowerCase() === ADMIN_USERNAME.toLowerCase());
+  const target = xiaofang || users.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''))[0];
+  if (target) target.role = 'admin';
+  fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), 'utf8');
+}
+ensureOneAdmin();
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, UPLOADS_DIR),
   filename: (req, file, cb) => cb(null, `${Date.now()}-${uuidv4().slice(0, 8)}${path.extname(file.originalname) || '.jpg'}`)
@@ -70,6 +85,17 @@ function sanitizeUser(u) {
   return rest;
 }
 
+function isAdmin(userId) {
+  const users = readJson(USERS_FILE);
+  const u = users.find(x => x.id === userId);
+  return u && u.role === 'admin';
+}
+
+function requireAdmin(req, res, next) {
+  if (!isAdmin(req.userId)) return res.status(403).json({ error: '需要管理员权限' });
+  next();
+}
+
 const DEFAULT_AVATAR = '🍳';
 
 // ========== 认证 API（无需登录）==========
@@ -82,10 +108,12 @@ app.post('/api/auth/register', (req, res) => {
     if (users.some(u => u.name.trim().toLowerCase() === name.trim().toLowerCase())) return res.status(400).json({ error: '该用户名已被注册' });
     const salt = crypto.randomBytes(16).toString('hex');
     const id = uuidv4();
+    const isFirstUser = users.length === 0;
     users.push({
       id,
       name: name.trim(),
       avatar: avatar != null && String(avatar).trim() ? String(avatar).trim() : DEFAULT_AVATAR,
+      role: isFirstUser ? 'admin' : 'user',
       salt,
       passwordHash: hashPassword(String(password), salt),
       createdAt: new Date().toISOString()
@@ -158,6 +186,38 @@ app.patch('/api/users/me', authMiddleware, (req, res) => {
     if (avatar !== undefined) users[idx].avatar = String(avatar).trim() || DEFAULT_AVATAR;
     writeJson(USERS_FILE, users);
     res.json(sanitizeUser(users[idx]));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ========== 管理员：用户列表与删除 ==========
+app.get('/api/users', authMiddleware, requireAdmin, (req, res) => {
+  try {
+    const users = readJson(USERS_FILE);
+    res.json(users.map(sanitizeUser));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.delete('/api/users/:id', authMiddleware, requireAdmin, (req, res) => {
+  try {
+    const targetId = req.params.id;
+    if (targetId === req.userId) return res.status(400).json({ error: '不能删除自己' });
+    const users = readJson(USERS_FILE);
+    const user = users.find(u => u.id === targetId);
+    if (!user) return res.status(404).json({ error: '用户不存在' });
+    const newUsers = users.filter(u => u.id !== targetId);
+    writeJson(USERS_FILE, newUsers);
+    const records = readJson(RECORDS_FILE).filter(r => r.userId !== targetId);
+    writeJson(RECORDS_FILE, records);
+    const sessions = readSessions();
+    for (const [t, uid] of Object.entries(sessions)) {
+      if (uid === targetId) delete sessions[t];
+    }
+    writeSessions(sessions);
+    res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

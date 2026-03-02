@@ -83,6 +83,54 @@ function showAppScreen() {
   if (currentUser) {
     $('#currentUserAvatar').textContent = currentUser.avatar || '🍳';
     $('#currentUserName').textContent = currentUser.name || '—';
+    if (currentUser.role === 'admin') {
+      $('#adminSection').classList.remove('hidden');
+      loadAdminUsers();
+    } else {
+      $('#adminSection').classList.add('hidden');
+    }
+  }
+}
+
+async function loadAdminUsers() {
+  if (!currentUser || currentUser.role !== 'admin') return;
+  try {
+    const list = await request(`${API}/users`);
+    renderAdminUserList(list);
+  } catch (err) {
+    $('#adminUserList').innerHTML = '<p class="empty-tip">加载失败或无权访问</p>';
+  }
+}
+
+function renderAdminUserList(list) {
+  const el = $('#adminUserList');
+  if (!list.length) {
+    el.innerHTML = '<p class="empty-tip">暂无其他用户</p>';
+    return;
+  }
+  el.innerHTML = list.map(u => {
+    const isSelf = u.id === currentUser.id;
+    const roleLabel = u.role === 'admin' ? '管理员' : '用户';
+    return `
+      <div class="admin-user-item" data-id="${u.id}">
+        <span class="admin-user-avatar">${escapeHtml(u.avatar || '🍳')}</span>
+        <span class="admin-user-name">${escapeHtml(u.name)}</span>
+        <span class="admin-user-role">${roleLabel}</span>
+        ${isSelf ? '<span class="admin-user-self">（当前）</span>' : `<button type="button" class="btn btn-danger btn-sm btn-delete-user" data-id="${u.id}">删除</button>`}
+      </div>`;
+  }).join('');
+  el.querySelectorAll('.btn-delete-user').forEach(btn => {
+    btn.addEventListener('click', () => deleteUser(btn.dataset.id));
+  });
+}
+
+async function deleteUser(userId) {
+  if (!confirm('确定删除该用户？其所有记录也会被删除。')) return;
+  try {
+    await request(`${API}/users/${userId}`, { method: 'DELETE' });
+    await loadAdminUsers();
+  } catch (err) {
+    alert(err.message || '删除失败');
   }
 }
 
@@ -287,6 +335,7 @@ function init() {
       showAppScreen();
       await loadRecords();
       updateOverview();
+      if (currentUser.role === 'admin') await loadAdminUsers();
     } catch (err) {
       alert(err.message || '登录失败');
     }
@@ -314,6 +363,7 @@ function init() {
       showAppScreen();
       await loadRecords();
       updateOverview();
+      if (currentUser.role === 'admin') await loadAdminUsers();
     } catch (err) {
       alert(err.message || '注册失败');
     }
@@ -395,6 +445,7 @@ function init() {
         showAppScreen();
         await loadRecords();
         updateOverview();
+        if (currentUser.role === 'admin') await loadAdminUsers();
         return;
       }
     }
