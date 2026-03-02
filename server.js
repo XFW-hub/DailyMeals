@@ -295,4 +295,4 @@ app.post('/api/records/with-image', authMiddleware, upload.single('image'), (req
   }
 });
 
-app.listen(PORT, () => console.log(`三餐记录服务已启动: http://localhost:${PORT}`));
+app.listen(Number(PORT), '0.0.0.0', () => console.log(`三餐记录服务已启动: http://0.0.0.0:${PORT}`));

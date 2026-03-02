@@ -1,0 +1,5 @@
+# Replit 运行配置
+run = "npm start"
+
+[deployment]
+run = ["sh", "-c", "npm install && npm start"]
