@@ -8,22 +8,34 @@ const MEAL_LABELS = {
 };
 const RATING_LABELS = { 1: '夯', 2: '顶级', 3: '人上人', 4: 'NPC', 5: '拉完了' };
 const AVATAR_OPTIONS = ['🍳', '🍜', '🥡', '🍕', '🍱', '🥗', '🍲', '☕', '🍰', '🥤', '🍪', '🌮', '🍔', '🍟', '🥪', '🧁'];
+const TOKEN_KEY = 'dailymeals_token';
+const USER_KEY = 'dailymeals_user';
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => el.querySelectorAll(sel);
 
-let users = [];
+let token = localStorage.getItem(TOKEN_KEY);
+let currentUser = null;
 let records = [];
-let currentUserId = '';
 let currentRange = 'day';
-let editingAvatarUserId = null;
+
+function getAuthHeaders() {
+  const h = { 'Content-Type': 'application/json' };
+  if (token) h['Authorization'] = 'Bearer ' + token;
+  return h;
+}
 
 async function request(url, options = {}) {
   const res = await fetch(url, {
     ...options,
-    headers: { 'Content-Type': 'application/json', ...options.headers }
+    headers: { ...getAuthHeaders(), ...options.headers }
   });
   const data = await res.json().catch(() => ({}));
+  if (res.status === 401) {
+    logout();
+    showAuthScreen();
+    throw new Error(data.error || '请重新登录');
+  }
   if (!res.ok) throw new Error(data.error || res.statusText);
   return data;
 }
@@ -38,9 +50,8 @@ function escapeHtml(s) {
 function getDateRange() {
   const today = new Date().toISOString().slice(0, 10);
   let from, to;
-  if (currentRange === 'day') {
-    from = to = today;
-  } else if (currentRange === 'week') {
+  if (currentRange === 'day') from = to = today;
+  else if (currentRange === 'week') {
     const d = new Date();
     const day = d.getDay();
     const diff = d.getDate() - day + (day === 0 ? -6 : 1);
@@ -57,95 +68,47 @@ function getDateRange() {
   return { dateFrom: from, dateTo: to };
 }
 
-async function loadUsers() {
-  users = await request(`${API}/users`);
-  renderUserList();
-  if (currentUserId && !users.some(u => u.id === currentUserId)) currentUserId = '';
-  if (!currentUserId && users.length) currentUserId = users[0].id;
+function showAuthScreen() {
+  $('#authScreen').classList.remove('hidden');
+  $('#appScreen').classList.add('hidden');
+  token = null;
+  currentUser = null;
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
 }
 
-function renderUserList() {
-  const list = $('#userList');
-  list.innerHTML = users.map(u => {
-    const avatar = u.avatar || '🍳';
-    const active = u.id === currentUserId ? ' active' : '';
-    return `<li class="user-item${active}" data-id="${u.id}" data-avatar="${escapeHtml(avatar)}">
-      <span class="avatar-wrap" title="点击更换头像">${escapeHtml(avatar)}</span>
-      <span class="user-name">${escapeHtml(u.name)}</span>
-    </li>`;
-  }).join('');
-
-  list.querySelectorAll('.user-item').forEach(el => {
-    const id = el.dataset.id;
-    el.addEventListener('click', e => {
-      if (e.target.closest('.avatar-wrap')) {
-        editingAvatarUserId = id;
-        openAvatarPickerEdit(id);
-      } else {
-        selectUser(id);
-      }
-    });
-  });
+function showAppScreen() {
+  $('#authScreen').classList.add('hidden');
+  $('#appScreen').classList.remove('hidden');
+  if (currentUser) {
+    $('#currentUserAvatar').textContent = currentUser.avatar || '🍳';
+    $('#currentUserName').textContent = currentUser.name || '—';
+  }
 }
 
-function selectUser(id) {
-  currentUserId = id;
-  renderUserList();
-  $('#noUserTip').classList.add('hidden');
-  $('#userViewSection').classList.remove('hidden');
-  loadRecords();
-  updateOverview();
-}
-
-function openAvatarPickerEdit(userId) {
-  const user = users.find(u => u.id === userId);
-  if (!user) return;
-  const container = $('#avatarPickerEdit');
-  container.innerHTML = AVATAR_OPTIONS.map(emoji => {
-    const selected = (user.avatar || '🍳') === emoji ? ' selected' : '';
-    return `<button type="button" class="avatar-option${selected}" data-emoji="${escapeHtml(emoji)}">${emoji}</button>`;
-  }).join('');
-  container.querySelectorAll('.avatar-option').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const emoji = btn.dataset.emoji;
-      try {
-        await request(`${API}/users/${userId}`, {
-          method: 'PATCH',
-          body: JSON.stringify({ avatar: emoji })
-        });
-        await loadUsers();
-        if (currentUserId === userId) { /* already selected */ }
-        $('#modalEditAvatar').classList.add('hidden');
-        editingAvatarUserId = null;
-      } catch (err) {
-        alert(err.message || '更新失败');
-      }
-    });
-  });
-  $('#modalEditAvatar').classList.remove('hidden');
+async function loadMe() {
+  if (!token) return null;
+  try {
+    currentUser = await request(`${API}/me`);
+    localStorage.setItem(USER_KEY, JSON.stringify(currentUser));
+    return currentUser;
+  } catch {
+    return null;
+  }
 }
 
 async function loadRecords() {
-  if (!currentUserId) return;
   const params = new URLSearchParams();
-  params.set('userId', currentUserId);
-  const singleDate = $('#filterDate').value;
-  if ($('#userViewSection').classList.contains('hidden')) {
-    if (singleDate) params.set('date', singleDate);
-  } else {
-    const { dateFrom, dateTo } = getDateRange();
-    params.set('dateFrom', dateFrom);
-    params.set('dateTo', dateTo);
-  }
+  const { dateFrom, dateTo } = getDateRange();
+  params.set('dateFrom', dateFrom);
+  params.set('dateTo', dateTo);
   records = await request(`${API}/records?${params}`);
   renderRecords();
 }
 
 function updateOverview() {
-  if (!currentUserId) return;
   const { dateFrom, dateTo } = getDateRange();
   const params = new URLSearchParams();
-  params.set('userId', currentUserId);
   params.set('dateFrom', dateFrom);
   params.set('dateTo', dateTo);
   request(`${API}/records?${params}`).then(list => renderOverview(list, dateFrom, dateTo));
@@ -182,8 +145,6 @@ function renderRecords() {
     return;
   }
   list.innerHTML = records.map(r => {
-    const user = users.find(u => u.id === r.userId);
-    const userName = user ? user.name : '未知';
     const img = r.imageUrl
       ? `<img class="thumb" src="${escapeHtml(r.imageUrl)}" alt="" />`
       : '<div class="thumb placeholder">🍽️</div>';
@@ -197,7 +158,6 @@ function renderRecords() {
             <span class="record-type">${MEAL_LABELS[r.mealType] || r.mealType}</span>
             <span class="record-rating">${RATING_LABELS[r.rating] || r.rating}</span>
             <span class="record-price">${priceStr}</span>
-            <span>${escapeHtml(userName)}</span>
           </div>
           <div class="record-desc">${escapeHtml(r.foodDesc) || '（未填写）'}</div>
           ${reviewStr ? `<div class="record-review">${reviewStr}</div>` : ''}
@@ -228,14 +188,9 @@ function bindRatingUi() {
   });
 }
 
-async function submitRecord(payload, imageFile) {
+async function submitRecord(imageFile) {
   const date = $('#filterDate').value || new Date().toISOString().slice(0, 10);
-  if (!currentUserId) {
-    alert('请先从左侧选择用户');
-    return;
-  }
   const body = {
-    userId: currentUserId,
     date,
     mealType: $('#mealType').value,
     foodDesc: $('#foodDesc').value.trim(),
@@ -246,7 +201,6 @@ async function submitRecord(payload, imageFile) {
 
   if (imageFile) {
     const form = new FormData();
-    form.append('userId', body.userId);
     form.append('date', body.date);
     form.append('mealType', body.mealType);
     form.append('foodDesc', body.foodDesc);
@@ -254,8 +208,13 @@ async function submitRecord(payload, imageFile) {
     form.append('price', body.price);
     form.append('review', body.review);
     form.append('image', imageFile);
-    const res = await fetch(`${API}/records/with-image`, { method: 'POST', body: form });
+    const res = await fetch(`${API}/records/with-image`, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token },
+      body: form
+    });
     const data = await res.json();
+    if (res.status === 401) { logout(); showAuthScreen(); throw new Error('请重新登录'); }
     if (!res.ok) throw new Error(data.error || res.statusText);
     return data;
   }
@@ -266,7 +225,17 @@ async function deleteRecord(id) {
   if (!confirm('确定删除这条记录？')) return;
   await request(`${API}/records/${id}`, { method: 'DELETE' });
   await loadRecords();
-  if (currentUserId) updateOverview();
+  updateOverview();
+}
+
+function logout() {
+  if (token) {
+    fetch(`${API}/auth/logout`, { method: 'POST', headers: getAuthHeaders() }).catch(() => {});
+  }
+  token = null;
+  currentUser = null;
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
 }
 
 function renderAvatarPicker(containerId, selectedEmoji, onSelect) {
@@ -288,14 +257,107 @@ function renderAvatarPicker(containerId, selectedEmoji, onSelect) {
 function init() {
   $('#filterDate').value = new Date().toISOString().slice(0, 10);
 
+  // 登录/注册切换
+  $$('.auth-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      $$('.auth-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      const isLogin = tab.dataset.tab === 'login';
+      $('#formLogin').classList.toggle('hidden', !isLogin);
+      $('#formRegister').classList.toggle('hidden', isLogin);
+    });
+  });
+
+  $('#formLogin').addEventListener('submit', async e => {
+    e.preventDefault();
+    const name = $('#loginName').value.trim();
+    const password = $('#loginPassword').value;
+    try {
+      const res = await fetch(`${API}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, password })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '登录失败');
+      token = data.token;
+      currentUser = data.user;
+      localStorage.setItem(TOKEN_KEY, token);
+      localStorage.setItem(USER_KEY, JSON.stringify(currentUser));
+      showAppScreen();
+      await loadRecords();
+      updateOverview();
+    } catch (err) {
+      alert(err.message || '登录失败');
+    }
+  });
+
   let selectedAvatar = '🍳';
-  renderAvatarPicker('#avatarPicker', selectedAvatar, emoji => { selectedAvatar = emoji; });
+  renderAvatarPicker('#avatarPickerRegister', selectedAvatar, emoji => { selectedAvatar = emoji; });
+  $('#formRegister').addEventListener('submit', async e => {
+    e.preventDefault();
+    const name = $('#registerName').value.trim();
+    const password = $('#registerPassword').value;
+    if (password.length < 4) { alert('密码至少 4 位'); return; }
+    try {
+      const res = await fetch(`${API}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, password, avatar: selectedAvatar })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '注册失败');
+      token = data.token;
+      currentUser = data.user;
+      localStorage.setItem(TOKEN_KEY, token);
+      localStorage.setItem(USER_KEY, JSON.stringify(currentUser));
+      showAppScreen();
+      await loadRecords();
+      updateOverview();
+    } catch (err) {
+      alert(err.message || '注册失败');
+    }
+  });
+
+  $('#btnLogout').addEventListener('click', () => {
+    logout();
+    showAuthScreen();
+  });
+
+  $('#btnEditAvatar').addEventListener('click', () => {
+    const container = $('#avatarPickerEdit');
+    container.innerHTML = AVATAR_OPTIONS.map(emoji => {
+      const sel = (currentUser && (currentUser.avatar || '🍳') === emoji) ? ' selected' : '';
+      return `<button type="button" class="avatar-option${sel}" data-emoji="${escapeHtml(emoji)}">${emoji}</button>`;
+    }).join('');
+    container.querySelectorAll('.avatar-option').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const emoji = btn.dataset.emoji;
+        try {
+          currentUser = await request(`${API}/users/me`, {
+            method: 'PATCH',
+            body: JSON.stringify({ avatar: emoji })
+          });
+          localStorage.setItem(USER_KEY, JSON.stringify(currentUser));
+          $('#currentUserAvatar').textContent = emoji;
+          $('#modalEditAvatar').classList.add('hidden');
+        } catch (err) {
+          alert(err.message || '更新失败');
+        }
+      });
+    });
+    $('#modalEditAvatar').classList.remove('hidden');
+  });
+  $('#btnCancelAvatar').addEventListener('click', () => $('#modalEditAvatar').classList.add('hidden'));
+  $('#modalEditAvatar').addEventListener('click', e => {
+    if (e.target.id === 'modalEditAvatar') e.target.classList.add('hidden');
+  });
 
   $('#formAdd').addEventListener('submit', async e => {
     e.preventDefault();
     const imageFile = $('#imageFile').files[0];
     try {
-      await submitRecord(null, imageFile);
+      await submitRecord(imageFile);
       $('#foodDesc').value = '';
       $('#price').value = '';
       $('#review').value = '';
@@ -304,7 +366,7 @@ function init() {
       $('.rating-item[data-rating="3"]')?.classList.add('checked');
       $('input[name="rating"][value="3"]').checked = true;
       await loadRecords();
-      if (currentUserId) updateOverview();
+      updateOverview();
     } catch (err) {
       alert(err.message || '保存失败');
     }
@@ -322,52 +384,21 @@ function init() {
   $('#dateFrom').addEventListener('change', () => { currentRange = 'custom'; loadRecords(); updateOverview(); });
   $('#dateTo').addEventListener('change', () => { currentRange = 'custom'; loadRecords(); updateOverview(); });
 
-  $('#btnAddUser').addEventListener('click', () => {
-    selectedAvatar = '🍳';
-    renderAvatarPicker('#avatarPicker', selectedAvatar, emoji => { selectedAvatar = emoji; });
-    $('#modalAddUser').classList.remove('hidden');
-    $('#newUserName').value = '';
-    $('#newUserName').focus();
-  });
-  $('#btnCancelUser').addEventListener('click', () => $('#modalAddUser').classList.add('hidden'));
-  $('#modalAddUser').addEventListener('click', e => {
-    if (e.target.id === 'modalAddUser') e.target.classList.add('hidden');
-  });
-  $('#formAddUser').addEventListener('submit', async e => {
-    e.preventDefault();
-    const name = $('#newUserName').value.trim();
-    if (!name) return;
-    try {
-      await request(`${API}/users`, { method: 'POST', body: JSON.stringify({ name, avatar: selectedAvatar }) });
-      $('#modalAddUser').classList.add('hidden');
-      await loadUsers();
-      currentUserId = users.find(u => u.name === name)?.id || users[0]?.id;
-      selectUser(currentUserId);
-    } catch (err) {
-      alert(err.message || '添加失败');
-    }
-  });
-
-  $('#btnCancelAvatar').addEventListener('click', () => {
-    $('#modalEditAvatar').classList.add('hidden');
-    editingAvatarUserId = null;
-  });
-  $('#modalEditAvatar').addEventListener('click', e => {
-    if (e.target.id === 'modalEditAvatar') e.target.classList.add('hidden');
-  });
-
   bindRatingUi();
   $('.rating-item[data-rating="3"]')?.classList.add('checked');
   $('input[name="rating"][value="3"]').checked = true;
 
   (async () => {
-    await loadUsers();
-    if (currentUserId) {
-      $('#noUserTip').classList.add('hidden');
-      $('#userViewSection').classList.remove('hidden');
-      await loadRecords();
-      updateOverview();
+    if (token) {
+      const user = await loadMe();
+      if (user) {
+        showAppScreen();
+        await loadRecords();
+        updateOverview();
+        return;
+      }
     }
+    showAuthScreen();
   })();
 }
 

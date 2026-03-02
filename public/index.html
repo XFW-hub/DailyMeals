@@ -10,11 +10,52 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="app">
+  <!-- 未登录：显示登录/注册 -->
+  <div id="authScreen" class="auth-screen">
+    <div class="auth-card card">
+      <h1>🍽️ 每日三餐记录</h1>
+      <div class="auth-tabs">
+        <button type="button" class="auth-tab active" data-tab="login">登录</button>
+        <button type="button" class="auth-tab" data-tab="register">注册</button>
+      </div>
+      <form id="formLogin" class="auth-form">
+        <div class="form-row">
+          <label>用户名</label>
+          <input type="text" id="loginName" placeholder="请输入用户名" required />
+        </div>
+        <div class="form-row">
+          <label>密码</label>
+          <input type="password" id="loginPassword" placeholder="请输入密码" required />
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">登录</button>
+      </form>
+      <form id="formRegister" class="auth-form hidden">
+        <div class="form-row">
+          <label>头像</label>
+          <div id="avatarPickerRegister" class="avatar-picker"></div>
+        </div>
+        <div class="form-row">
+          <label>用户名</label>
+          <input type="text" id="registerName" placeholder="请输入用户名" required />
+        </div>
+        <div class="form-row">
+          <label>密码</label>
+          <input type="password" id="registerPassword" placeholder="至少 4 位" required minlength="4" />
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">注册</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- 已登录：主应用 -->
+  <div id="appScreen" class="app hidden">
     <aside class="sidebar">
-      <div class="sidebar-title">用户</div>
-      <ul id="userList" class="user-list"></ul>
-      <button type="button" class="btn btn-ghost btn-block" id="btnAddUser">+ 添加用户</button>
+      <div class="sidebar-current">
+        <span class="avatar-wrap" id="currentUserAvatar">🍳</span>
+        <span class="user-name" id="currentUserName">—</span>
+      </div>
+      <button type="button" class="btn btn-ghost btn-block" id="btnLogout">退出登录</button>
+      <button type="button" class="btn btn-ghost btn-block" id="btnEditAvatar">更换头像</button>
     </aside>
 
     <div class="content">
@@ -71,7 +112,7 @@
           </form>
         </section>
 
-        <section id="userViewSection" class="user-view-section hidden">
+        <section id="userViewSection" class="user-view-section">
           <div class="range-toolbar">
             <label>时间范围</label>
             <div class="range-btns">
@@ -94,30 +135,7 @@
             <div id="recordList" class="record-list"></div>
           </div>
         </section>
-        <section id="noUserTip" class="empty-tip-card card">
-          <p>请从左侧选择用户，查看该用户一段时间内的概览与详情。</p>
-        </section>
       </main>
-    </div>
-  </div>
-
-  <div id="modalAddUser" class="modal hidden">
-    <div class="modal-content">
-      <h3>添加用户</h3>
-      <form id="formAddUser">
-        <div class="form-row">
-          <label>头像</label>
-          <div id="avatarPicker" class="avatar-picker"></div>
-        </div>
-        <div class="form-row">
-          <label>用户名</label>
-          <input type="text" id="newUserName" placeholder="输入用户名" required />
-        </div>
-        <div class="modal-actions">
-          <button type="button" class="btn btn-ghost" id="btnCancelUser">取消</button>
-          <button type="submit" class="btn btn-primary">添加</button>
-        </div>
-      </form>
     </div>
   </div>
 
