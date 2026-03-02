@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>每日三餐记录</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="sidebar-title">用户</div>
+      <ul id="userList" class="user-list"></ul>
+      <button type="button" class="btn btn-ghost btn-block" id="btnAddUser">+ 添加用户</button>
+    </aside>
+
+    <div class="content">
+      <header class="header">
+        <h1>🍽️ 每日三餐记录</h1>
+        <div class="header-actions">
+          <input type="date" id="filterDate" class="input-date" title="添加记录默认日期" />
+        </div>
+      </header>
+
+      <main class="main">
+        <section class="add-card card">
+          <h2>添加记录</h2>
+          <form id="formAdd" class="form-add">
+            <div class="form-row">
+              <label>类型</label>
+              <select id="mealType" required>
+                <option value="breakfast">早餐</option>
+                <option value="lunch">午餐</option>
+                <option value="dinner">晚餐</option>
+                <option value="snack">零食</option>
+                <option value="late_night">夜宵</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label>吃了什么</label>
+              <input type="text" id="foodDesc" placeholder="例如：牛肉面、奶茶、炸鸡..." />
+            </div>
+            <div class="form-row">
+              <label>价格（元）</label>
+              <input type="number" id="price" placeholder="0" min="0" step="0.01" required />
+            </div>
+            <div class="form-row">
+              <label>评级</label>
+              <div class="rating-options" id="ratingOptions">
+                <label class="rating-item" data-rating="1"><input type="radio" name="rating" value="1" /> 夯</label>
+                <label class="rating-item" data-rating="2"><input type="radio" name="rating" value="2" /> 顶级</label>
+                <label class="rating-item" data-rating="3"><input type="radio" name="rating" value="3" /> 人上人</label>
+                <label class="rating-item" data-rating="4"><input type="radio" name="rating" value="4" /> NPC</label>
+                <label class="rating-item" data-rating="5"><input type="radio" name="rating" value="5" /> 拉完了</label>
+              </div>
+            </div>
+            <div class="form-row">
+              <label>评价（可选）</label>
+              <textarea id="review" placeholder="好吃吗？有什么想说的..." rows="2"></textarea>
+            </div>
+            <div class="form-row">
+              <label>图片（可选）</label>
+              <input type="file" id="imageFile" accept="image/*" />
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">保存记录</button>
+            </div>
+          </form>
+        </section>
+
+        <section id="userViewSection" class="user-view-section hidden">
+          <div class="range-toolbar">
+            <label>时间范围</label>
+            <div class="range-btns">
+              <button type="button" class="btn btn-ghost btn-range active" data-range="day">今日</button>
+              <button type="button" class="btn btn-ghost btn-range" data-range="week">本周</button>
+              <button type="button" class="btn btn-ghost btn-range" data-range="month">本月</button>
+              <span class="range-custom">
+                <input type="date" id="dateFrom" class="input-date small" />
+                <span>至</span>
+                <input type="date" id="dateTo" class="input-date small" />
+              </span>
+            </div>
+          </div>
+          <div class="overview-card card">
+            <h2>概览</h2>
+            <div id="overviewContent" class="overview-content"></div>
+          </div>
+          <div class="list-section">
+            <h2>详情</h2>
+            <div id="recordList" class="record-list"></div>
+          </div>
+        </section>
+        <section id="noUserTip" class="empty-tip-card card">
+          <p>请从左侧选择用户，查看该用户一段时间内的概览与详情。</p>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <div id="modalAddUser" class="modal hidden">
+    <div class="modal-content">
+      <h3>添加用户</h3>
+      <form id="formAddUser">
+        <div class="form-row">
+          <label>头像</label>
+          <div id="avatarPicker" class="avatar-picker"></div>
+        </div>
+        <div class="form-row">
+          <label>用户名</label>
+          <input type="text" id="newUserName" placeholder="输入用户名" required />
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" id="btnCancelUser">取消</button>
+          <button type="submit" class="btn btn-primary">添加</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="modalEditAvatar" class="modal hidden">
+    <div class="modal-content">
+      <h3>更换头像</h3>
+      <div id="avatarPickerEdit" class="avatar-picker"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="btnCancelAvatar">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

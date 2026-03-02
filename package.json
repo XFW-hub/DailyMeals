@@ -1,0 +1,19 @@
+{
+  "name": "daily-meals-record",
+  "version": "1.0.0",
+  "description": "每日三餐记录 - 支持多用户、图片上传、五档评级",
+  "main": "server.js",
+  "engines": {
+    "node": ">=16"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "multer": "^1.4.5-lts.1",
+    "uuid": "^9.0.0"
+  }
+}
